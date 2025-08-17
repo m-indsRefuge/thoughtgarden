@@ -1,7 +1,8 @@
 # file: app/main.py
-# The updated main application entry point.
+# The updated main application entry point with CORS middleware.
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 
@@ -27,11 +28,29 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Thought Experiment Simulator (TES)",
+    title="Thought Garden",
     description="Backend service for generating and running thought experiments.",
     version="1.0.0",
     lifespan=lifespan
 )
+
+# --- Add CORS Middleware ---
+# This section allows our frontend (running on localhost:1420) to communicate
+# with our backend (running on localhost:8001).
+origins = [
+    "http://localhost:1420",
+    "tauri://localhost",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+# --- End of CORS Middleware ---
+
 
 app.include_router(endpoints.router, prefix="/api")
 
@@ -39,4 +58,4 @@ app.include_router(endpoints.router, prefix="/api")
 @app.get("/")
 async def read_root():
     """A simple root endpoint to confirm the server is running."""
-    return {"message": "Welcome to the TES Backend!"}
+    return {"message": "Welcome to the Thought Garden Backend!"}
