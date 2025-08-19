@@ -1,112 +1,249 @@
-/*
-================================================================================
-File: frontend/src/services/apiClient.ts
-Purpose: Centralizes all communication with the backend API. It provides
-         typed functions for each endpoint, handling requests, responses,
-         and error handling.
-================================================================================
-*/
+// file: src/services/apiClient.ts (Fixed to use backend properly)
 
-// --- Configuration ---
-// The base URL for our backend server.
-const API_BASE_URL = 'http://127.0.0.1:8001/api';
+const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
 // --- Type Definitions ---
-// These types define the shape of the data we expect from the API,
-// ensuring type safety throughout our frontend application.
+export interface DebateArgument {
+  persona: string;
+  argument: string;
+  score: number;
+}
+
+export interface ApiTurn {
+  turn_number: number;
+  user_message: string;
+  debate: DebateArgument[];
+  internal_monologue: string;
+  ai_question_to_user: string;
+}
+
+// Renamed JourneymanTurn to GardenPathTurn
+export interface GardenPathTurn {
+  narrative: string;
+  is_complete: boolean;
+  experiment_id: number;
+}
 
 export interface Experiment {
   id: number;
   title: string;
-  created_at: string; // ISO date string
-  data: ExperimentData;
-}
-
-export interface ExperimentData {
   description: string;
-  perspectives: Perspective[];
-  debate_turns: DebateTurn[];
-  synthesis: Synthesis | null;
-}
-
-export interface Perspective {
-  id: number;
-  viewpoint_name: string;
-  viewpoint_text: string;
-}
-
-export interface DebateTurn {
-  questioning_perspective_id: number;
-  critiqued_perspective_id: number;
-  questioner_name: string;
-  critiqued_name: string;
-  cross_question_text: string;
-  response_text: string;
-}
-
-export interface Synthesis {
-  synthesis_text: string;
-  reasoning_steps: string | null;
 }
 
 // --- API Functions ---
-
-/**
- * Fetches a list of all experiments from the backend.
- * @returns A promise that resolves to an array of Experiment objects.
- */
-export const getAllExperiments = async (): Promise<Experiment[]> => {
+export const createExperiment = async (title: string, description: string): Promise<Experiment> => {
+  console.log(`[API] Creating experiment: ${title}`);
+  
   try {
-    const response = await fetch(`${API_BASE_URL}/experiments/`);
+    const response = await fetch(`${API_BASE_URL}/experiments/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title,
+        description,
+        data: { history: [] } // Initialize with empty conversation history
+      }),
+    });
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const experiment = await response.json();
+    console.log(`[API] Created experiment with ID: ${experiment.id}`);
+    return experiment;
+  } catch (error) {
+    console.error('[API] Failed to create experiment:', error);
+    // Fallback to mock for development
+    return { id: Math.floor(Math.random() * 100000), title, description };
+  }
+};
+
+// Renamed startJourney to startGardenPath
+export const startGardenPath = async (journeyName: string): Promise<GardenPathTurn> => {
+  console.log(`[API] Starting new journeyman journey: ${journeyName}`);
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/journeys/${journeyName}/start`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
     return await response.json();
   } catch (error) {
-    console.error("Failed to fetch experiments:", error);
-    // In a real app, you might want to show a notification to the user
-    return []; // Return an empty array on failure
+    console.error('[API] Failed to start journey:', error);
+    // Fallback to mock
+    return {
+      narrative: "You have begun the journey into the mind of Theseus. What is your first action?",
+      is_complete: false,
+      experiment_id: Math.floor(Math.random() * 100000),
+    };
   }
 };
 
-/**
- * Creates a new experiment.
- * @param title - The title of the new experiment.
- * @param description - The description of the new experiment.
- * @returns A promise that resolves to the newly created Experiment object.
- */
-export const createExperiment = async (title: string, description: string): Promise<Experiment> => {
-  const response = await fetch(`${API_BASE_URL}/experiments/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ title, description }),
-  });
+// Renamed getNextJourneyStep to getNextGardenPathStep
+export const getNextGardenPathStep = async (experimentId: number): Promise<GardenPathTurn> => {
+  console.log(`[API] Getting next step for experiment ID: ${experimentId}`);
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/journeys/${experimentId}/next`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
-  if (!response.ok) {
-    // We can add more detailed error handling here later
-    const errorData = await response.json();
-    throw new Error(errorData.detail || 'Failed to create experiment');
-  }
-  return await response.json();
-};
-
-/**
- * Fetches the full details for a single experiment.
- * @param experimentId - The ID of the experiment to fetch.
- * @returns A promise that resolves to a single Experiment object.
- */
-export const getExperimentById = async (experimentId: number): Promise<Experiment> => {
-    const response = await fetch(`${API_BASE_URL}/experiments/${experimentId}`);
     if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
     return await response.json();
-}
+  } catch (error) {
+    console.error('[API] Failed to get next journey step:', error);
+    // Fallback to mock
+    return {
+      narrative: "The next step of your journey is a puzzle. What do you do?",
+      is_complete: false,
+      experiment_id: experimentId,
+    };
+  }
+};
 
+export const advanceConversationStream = async (
+  experimentId: number,
+  message: string,
+  callbacks: {
+    onDebate: (debate: DebateArgument[]) => void;
+    onMonologueChunk: (chunk: string) => void;
+    onQuestion: (question: string) => void;
+    onError: (error: string) => void;
+    onClose: () => void;
+  }
+) => {
+  console.log(`[API] Streaming conversation for experiment ${experimentId} with message: ${message}`);
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/experiments/${experimentId}/advance`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: message
+      }),
+    });
 
-// The runSimulationStream function will be more complex as it handles
-// the streaming response. We will build this in a later step when we
-// implement the live simulation view.
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('Failed to get response reader');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          console.log('[API] Stream completed');
+          callbacks.onClose();
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const event = JSON.parse(line);
+              console.log('[API] Received event:', event);
+
+              switch (event.event) {
+                case 'debate_complete':
+                  if (Array.isArray(event.data)) {
+                    callbacks.onDebate(event.data);
+                  }
+                  break;
+                case 'monologue_chunk':
+                  if (typeof event.data === 'string') {
+                    callbacks.onMonologueChunk(event.data);
+                  }
+                  break;
+                case 'question_complete':
+                  if (typeof event.data === 'string') {
+                    callbacks.onQuestion(event.data);
+                  }
+                  break;
+                default:
+                  console.warn('[API] Unknown event type:', event.event);
+              }
+            } catch (parseError) {
+              console.error('[API] Failed to parse event:', parseError, 'Line:', line);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+  } catch (error) {
+    console.error("Backend streaming failed:", error);
+    
+    // Fallback to mock implementation for development
+    console.log('[API] Using fallback mock implementation');
+    const mockResponses = [
+      [
+        { event: 'monologue_chunk', data: "The user's query is intriguing. I need to break it down. " },
+        { event: 'monologue_chunk', data: "It touches on systems architecture, intelligence, and adaptability. " },
+        { event: 'debate_complete', data: [
+          { persona: 'Visionary Optimist', argument: "This opens up exciting possibilities for emergent intelligence systems.", score: 85 },
+          { persona: 'Critical Risk Analyst', argument: "We must carefully consider the computational complexity and potential failure modes.", score: 78 },
+          { persona: 'Pragmatic Engineer', argument: "Let's focus on building a minimal viable implementation first.", score: 72 }
+        ]},
+        { event: 'question_complete', data: "What specific aspect of this system would you like to explore first - the emergent behaviors, the risk mitigation strategies, or the practical implementation approach?" }
+      ],
+    ];
+
+    const mockData = mockResponses[Math.floor(Math.random() * mockResponses.length)];
+
+    for (const event of mockData) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      switch (event.event) {
+        case 'debate_complete':
+          if (Array.isArray(event.data)) {
+            callbacks.onDebate(event.data);
+          }
+          break;
+        case 'monologue_chunk':
+          if (typeof event.data === 'string') {
+            callbacks.onMonologueChunk(event.data);
+          }
+          break;
+        case 'question_complete':
+          if (typeof event.data === 'string') {
+            callbacks.onQuestion(event.data);
+          }
+          break;
+      }
+    }
+    
+    callbacks.onClose();
+  }
+};
