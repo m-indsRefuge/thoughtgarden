@@ -1,39 +1,43 @@
+// file: src/App.tsx (Corrected Version)
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { toast, Toaster } from 'react-hot-toast';
 import * as apiClient from './services/apiClient';
+import { ExperimentData, Node, Edge, ExperimentCreate, NodeType, EdgeRelation, NodeMetadata, ReasoningGraph } from "./schemas";
 
-// --- Inline SVG Icons ---
-const MenuIcon = (props) => (
+
+// --- Inline SVG Icons (with corrected types) ---
+const MenuIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <line x1="4" x2="20" y1="12" y2="12" />
     <line x1="4" x2="20" y1="6" y2="6" />
     <line x1="4" x2="20" y1="18" y2="18" />
   </svg>
 );
-const XIcon = (props) => (
+const XIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M18 6L6 18" />
     <path d="M6 6L18 18" />
   </svg>
 );
-const SendIcon = (props) => (
+const SendIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M22 2L11 13" />
     <path d="M22 2L15 22L11 13L2 9L22 2Z" />
   </svg>
 );
-const LoaderIcon = (props) => (
+const LoaderIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
   </svg>
 );
-const PlusIcon = (props) => (
+const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M5 12h14" />
     <path d="M12 5v14" />
   </svg>
 );
-const WrenchIcon = (props) => (
+const WrenchIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94-7.94l-3.77 3.77a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0z" />
     <path d="M10.6 2.2a1 1 0 0 0-1.4 0L2.2 9.2a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1 7.94-7.94l-3.77 3.77z" />
@@ -41,13 +45,13 @@ const WrenchIcon = (props) => (
     <path d="M17.7 18.3l-1.6-1.6" />
   </svg>
 );
-const SparklesIcon = (props) => (
+const SparklesIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M14.5 4.5L21 11m-4-7l-7 7m10 0L14 14m0-7l7 7" />
     <path d="M12 2L8.5 8.5L2 12l6.5 3.5L12 22l3.5-6.5L22 12l-6.5-3.5L12 2Z" />
   </svg>
 );
-const BrainIcon = (props) => (
+const BrainIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M12 2a2.5 2.5 0 0 0-2.5 2.5v15a2.5 2.5 0 0 0 2.5 2.5v0" />
     <path d="M14 4.5A2.5 2.5 0 0 0 16.5 2V21a2.5 2.5 0 0 0-2.5-2.5v0" />
@@ -59,12 +63,12 @@ const BrainIcon = (props) => (
 );
 
 // --- NEW COMPONENT: GardenPathMenu ---
-const GardenPathMenu = ({ onSelectExperiment, onClose }) => {
+const GardenPathMenu = ({ onSelectExperiment, onClose }: { onSelectExperiment: (name: string) => void, onClose: () => void }) => {
   return (
     <div className="fixed inset-0 bg-gray-950 bg-opacity-75 flex items-center justify-center z-50">
       <div className="bg-black p-8 rounded-xl shadow-2xl max-w-sm w-full relative border border-gray-700">
         <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-white transition-colors">
-          <XIcon size={24} />
+          <XIcon />
         </button>
         <h3 className="text-xl font-bold mb-6 text-center text-white">Choose Your Thought Experiment</h3>
         <div className="space-y-4">
@@ -87,7 +91,15 @@ const GardenPathMenu = ({ onSelectExperiment, onClose }) => {
 };
 
 // --- MAIN COMPONENTS ---
-const ChatSidebar = ({ conversations, activeConversationId, onSelectConversation, onNewConversation, onOpenGuidedMenu, isSidebarOpen, setIsSidebarOpen }) => {
+const ChatSidebar = ({ conversations, activeConversationId, onSelectConversation, onNewConversation, onOpenGuidedMenu, isSidebarOpen, setIsSidebarOpen }: {
+  conversations: ExperimentData[];
+  activeConversationId: number | null;
+  onSelectConversation: (id: number) => void;
+  onNewConversation: () => void;
+  onOpenGuidedMenu: () => void;
+  isSidebarOpen: boolean;
+  setIsSidebarOpen: (isOpen: boolean) => void;
+}) => {
   const [showNewMenu, setShowNewMenu] = useState(false);
 
   return (
@@ -102,16 +114,16 @@ const ChatSidebar = ({ conversations, activeConversationId, onSelectConversation
       <div className="flex justify-between items-center mb-4 lg:mb-8">
         <h2 className="text-xl font-bold text-fuchsia-400">Thought Garden</h2>
         <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-white hover:text-gray-300">
-          <XIcon size={24} />
+          <XIcon />
         </button>
       </div>
       <div className="space-y-2 mb-4">
         <div className="relative">
-          <button 
+          <button
             onClick={() => setShowNewMenu(!showNewMenu)}
             className="flex items-center justify-center w-full px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors duration-200"
           >
-            <PlusIcon size={20} className="mr-2" /> New Session
+            <PlusIcon /> New Session
           </button>
           {showNewMenu && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50">
@@ -132,7 +144,7 @@ const ChatSidebar = ({ conversations, activeConversationId, onSelectConversation
             onClick={onOpenGuidedMenu}
             className="flex items-center justify-center w-full px-4 py-2 bg-fuchsia-600 hover:bg-fuchsia-500 rounded-lg transition-colors duration-200 text-black font-semibold"
           >
-            <WrenchIcon size={20} className="mr-2" /> The Garden Path
+            <WrenchIcon /> The Garden Path
           </button>
         </div>
       </div>
@@ -154,84 +166,32 @@ const ChatSidebar = ({ conversations, activeConversationId, onSelectConversation
   );
 };
 
-const UserMessage = ({ message }) => {
+const NodeDisplay = ({ node }: { node: Node }) => {
+  const isUserInput = node.type === 'user_input';
+  const isAiExpansion = node.type === 'ai_expansion';
+
   return (
-    <div className="flex justify-end mb-4">
-      <div className="bg-gray-800 text-white p-4 rounded-lg max-w-lg shadow-lg">
-        {typeof message.content === 'string' && <p>{message.content}</p>}
+    <div className={`mb-4 flex ${isUserInput ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`p-4 rounded-lg shadow-lg max-w-lg ${
+          isUserInput ? 'bg-fuchsia-600 text-black' : 'bg-gray-900 text-white border border-gray-800'
+        }`}
+      >
+        <p className="font-bold text-sm text-gray-400 mb-2">{isUserInput ? 'User Input' : 'AI Expansion'}</p>
+        <p>{node.content}</p>
       </div>
     </div>
   );
 };
 
-const AssistantMessage = ({ message, isStreaming = false, streamingContent }) => {
-  const content = isStreaming ? streamingContent : (message.content);
-
-  if (!content) return null;
-
-  return (
-    <div className="flex justify-start mb-6">
-      <div className="bg-gray-900 text-white p-6 rounded-lg max-w-3xl shadow-lg relative border border-gray-800">
-        <div className="absolute top-0 right-0 p-2 opacity-50">
-          {isStreaming ? (
-            <SparklesIcon className="animate-pulse text-fuchsia-400" size={18} />
-          ) : (
-            <SparklesIcon className="text-fuchsia-400" size={18} />
-          )}
-        </div>
-        
-        {/* Internal Monologue Section */}
-        <div className="bg-gray-800 p-4 rounded-lg mb-4 text-gray-300 border border-gray-700 shadow-inner">
-          <h4 className="font-bold text-sm text-gray-400 mb-2 flex items-center"><BrainIcon className="mr-2 text-gray-500" />Mind's Eye..</h4>
-          {content.monologue ? (
-            <p className="text-sm italic">{content.monologue}</p>
-          ) : (
-            <p className="text-sm italic animate-pulse">Thinking..</p>
-          )}
-        </div>
-
-        {/* Debate Section */}
-        <div className="mb-4">
-          <h4 className="font-bold text-sm text-gray-400 mb-2 flex items-center"><WrenchIcon className="mr-2 text-gray-500" />The Internal Struggle..</h4>
-          {content.debate.length > 0 ? (
-            <div className="space-y-2">
-              {content.debate.map((arg, index) => (
-                <div key={index} className="bg-gray-950 p-3 rounded-lg border border-gray-800">
-                  <div className="flex justify-between items-start mb-1">
-                    <p className="font-semibold text-xs text-fuchsia-400">{arg.persona || arg.persona_id}:</p>
-                    {arg.score && <span className="text-xs text-gray-500">({arg.score})</span>}
-                  </div>
-                  <p className="text-sm text-gray-300">{arg.argument || arg.argument_text}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-500 italic">The Internal Struggle...</p>
-          )}
-        </div>
-
-        {/* Final Question/Response Section */}
-        <div className="border-t pt-4 border-gray-700">
-          <h4 className="font-bold text-sm text-gray-400 mb-2">Consider This..</h4>
-          {content.question || content.ai_question_to_user ? (
-            <p className="font-semibold text-lg">{content.question || content.ai_question_to_user}</p>
-          ) : (
-            <p className="text-lg text-gray-500 italic animate-pulse">Talking...</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const ChatArea = ({ activeConversation, streamingTurn }) => {
-  const chatEndRef = useRef(null);
+const ChatArea = ({ activeConversation, streamingNodeContent }: { activeConversation: ExperimentData | null, streamingNodeContent: string }) => {
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [activeConversation, streamingTurn]);
+  }, [activeConversation, streamingNodeContent]);
 
   if (!activeConversation) {
     return (
@@ -241,27 +201,31 @@ const ChatArea = ({ activeConversation, streamingTurn }) => {
     );
   }
 
+  const nodesToDisplay = activeConversation.data.graph?.nodes || [];
+
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-6">
-      {activeConversation.messages.map((message, index) => {
-        const isLastMessage = index === activeConversation.messages.length - 1;
-        if (message.role === 'user') {
-          return <UserMessage key={message.id} message={message} />;
-        }
-        if (isLastMessage && streamingTurn.monologue) {
-          return <AssistantMessage key={message.id} message={message} isStreaming={true} streamingContent={streamingTurn} />;
-        }
-        return <AssistantMessage key={message.id} message={message} />;
-      })}
-      <div ref={chatEndRef} />
+    <div className="flex-1 flex flex-col h-full overflow-hidden">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        {nodesToDisplay.map((node) => (
+          <NodeDisplay key={node.id} node={node} />
+        ))}
+        {streamingNodeContent && (
+          <div className="flex justify-start mb-4">
+            <div className="p-4 rounded-lg shadow-lg max-w-lg bg-gray-900 text-white border border-gray-800 animate-pulse">
+              <p>{streamingNodeContent}</p>
+            </div>
+          </div>
+        )}
+        <div ref={chatEndRef} />
+      </div>
     </div>
   );
 };
 
-const ChatInput = ({ onSendMessage, isLoading }) => {
+const ChatInput = ({ onSendMessage, isLoading }: { onSendMessage: (content: string) => void, isLoading: boolean }) => {
   const [input, setInput] = useState('');
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -296,20 +260,20 @@ const ChatInput = ({ onSendMessage, isLoading }) => {
           ${isLoading ? 'bg-gray-700 cursor-not-allowed' : 'bg-fuchsia-600 hover:bg-fuchsia-500'}
         `}
       >
-        {isLoading ? <LoaderIcon size={24} className="animate-spin text-white" /> : <SendIcon size={24} />}
+        {isLoading ? <LoaderIcon className="animate-spin text-white" /> : <SendIcon />}
       </button>
     </div>
   );
 };
 
 const ThoughtGardenApp = () => {
-  const [conversations, setConversations] = useState([]);
-  const [activeConversationId, setActiveConversationId] = useState(null);
+  const [conversations, setConversations] = useState<ExperimentData[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
   const [showGardenPathMenu, setShowGardenPathMenu] = useState(false);
-  const streamingContentRef = useRef({ debate: [], monologue: '', question: '' });
+  const [streamingNodeContent, setStreamingNodeContent] = useState('');
 
   useEffect(() => {
     const handleResize = () => {
@@ -319,161 +283,131 @@ const ThoughtGardenApp = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const [streamingTurn, setStreamingTurn] = useState({
-    debate: [],
-    monologue: '',
-    question: ''
-  });
-
-  const handleNewConversation = useCallback(() => {
-    const newId = `temp-${Date.now()}`;
-    const newConversation = {
-      id: newId,
-      title: 'New Session',
-      messages: [],
-      createdAt: new Date(),
-      lastUpdatedAt: new Date(),
-    };
-    setConversations(prev => [newConversation, ...prev]);
-    setActiveConversationId(newId);
-    setIsSidebarOpen(false);
-  }, []);
-
-  const handleNewGuidedSession = useCallback(async (scriptName) => {
-    console.log(`Starting a new Guided session with script: ${scriptName}...`);
-    toast.success(`Starting a new Guided Session!`);
-    
+  const handleNewConversation = useCallback(async (initialMessage: string = 'New Session') => {
+    setIsLoading(true);
     try {
-      const journeyTurn = await apiClient.startGardenPath(scriptName);
-      const newId = journeyTurn.experiment_id.toString();
-      const newConversation = {
-        id: newId,
-        title: scriptName.split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' '),
-        messages: [
-          {
-            id: Date.now().toString(),
-            role: 'assistant',
-            content: { question: journeyTurn.narrative, debate: [], monologue: 'Journey initialized...' },
-            timestamp: new Date()
-          }
-        ],
-        createdAt: new Date(),
-        lastUpdatedAt: new Date(),
+      const experimentIn: ExperimentCreate = {
+        title: initialMessage.substring(0, 30) + '...',
+        description: initialMessage,
       };
-      setConversations(prev => [newConversation, ...prev]);
-      setActiveConversationId(newId);
+      const newExperiment = await apiClient.createExperiment(experimentIn);
+      setConversations(prev => [newExperiment, ...prev]);
+      setActiveConversationId(newExperiment.id);
       setIsSidebarOpen(false);
-      setShowGardenPathMenu(false); // Close the menu
-    } catch (error) {
-      console.error("Failed to start Guided session:", error);
-      toast.error("Failed to start Guided session");
+      setStreamingNodeContent('');
+    } catch (e) {
+      toast.error('Failed to start new conversation.');
+      console.error(e);
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
-  const handleSendMessage = async (content) => {
-    const currentConvoId = activeConversationId;
-    if (!currentConvoId) return;
+  const handleSendMessage = async (content: string) => {
+    let currentConvo = conversations.find(c => c.id === activeConversationId);
+    
+    // Logic to start a new conversation if one doesn't exist
+    if (!currentConvo) {
+      setIsLoading(true);
+      try {
+        const experimentIn: ExperimentCreate = {
+          title: content.substring(0, 30) + '...',
+          description: content,
+        };
+        const newExperiment = await apiClient.createExperiment(experimentIn);
+        setConversations(prev => [newExperiment, ...prev]);
+        setActiveConversationId(newExperiment.id);
+        currentConvo = newExperiment;
+      } catch (e) {
+        toast.error('Failed to start new conversation.');
+        console.error(e);
+        setIsLoading(false);
+        return;
+      } finally {
+        setIsLoading(false);
+      }
+    }
 
-    const userMessage = { id: Date.now().toString(), role: 'user', content, timestamp: new Date() };
-    const assistantPlaceholder = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      timestamp: new Date(),
-      content: { turn_number: 0, user_message: content, debate: [], internal_monologue: '', ai_question_to_user: '' }
+    // Optimistically update UI with user's message
+    const newUserNode: Node = {
+      id: `user-${Date.now()}`,
+      type: 'user_input',
+      content: content,
+      metadata: {
+        timestamp: new Date().toISOString(),
+        depth: currentConvo.data.graph?.nodes.length || 0,
+      }
     };
+
+    const newGraphNodes = [...(currentConvo.data.graph?.nodes || []), newUserNode];
 
     setConversations(prev =>
       prev.map(conv =>
-        conv.id === currentConvoId
-          ? { ...conv, messages: [...conv.messages, userMessage, assistantPlaceholder] }
+        conv.id === activeConversationId
+          ? {
+            ...conv,
+            data: {
+              ...conv.data,
+              graph: {
+                ...(conv.data.graph || { nodes: [], edges: [] }),
+                nodes: newGraphNodes,
+              }
+            }
+          }
           : conv
       )
     );
 
     setIsLoading(true);
-    setStreamingTurn({ debate: [], monologue: '', question: '' });
-    streamingContentRef.current = { debate: [], monologue: '', question: '' };
+    setStreamingNodeContent('');
 
     try {
-      let finalConvoId = currentConvoId;
-      let experimentId = null;
-
-      if (currentConvoId.startsWith('temp-')) {
-        const newExperiment = await apiClient.createExperiment("User-Driven Session", content);
-        finalConvoId = newExperiment.id.toString();
-        experimentId = newExperiment.id;
-
-        setConversations(prev =>
-          prev.map(c =>
-            c.id === currentConvoId
-              ? { ...c, id: finalConvoId, title: content.slice(0, 30) + '...' }
-              : c
-          )
-        );
-        setActiveConversationId(finalConvoId);
-      } else {
-        experimentId = parseInt(currentConvoId, 10);
-      }
-
-      await apiClient.advanceConversationStream(experimentId, content, {
-        onDebate: (debate) => {
-          streamingContentRef.current.debate = debate;
-          setStreamingTurn(prev => ({ ...prev, debate }));
+      await apiClient.advanceConversationStream(currentConvo.id, content, {
+        onStreamChunk: (chunk: string) => {
+          setStreamingNodeContent(prev => prev + chunk);
         },
-        onMonologueChunk: (chunk) => {
-          streamingContentRef.current.monologue += chunk;
-          setStreamingTurn(prev => ({ ...prev, monologue: streamingContentRef.current.monologue }));
-        },
-        onQuestion: (question) => {
-          streamingContentRef.current.question = question;
-          setStreamingTurn(prev => ({ ...prev, question }));
-        },
-        onError: (error) => {
-          toast.error(error);
+        onError: (error: string) => {
+          toast.error(`Error: ${error}`);
           setIsLoading(false);
         },
-        onClose: () => {
-          const finalTurnData = {
-            turn_number: 0,
-            user_message: content,
-            debate: streamingContentRef.current.debate,
-            internal_monologue: streamingContentRef.current.monologue,
-            ai_question_to_user: streamingContentRef.current.question,
-          };
-
-          setConversations(prev =>
-            prev.map(conv =>
-              conv.id === finalConvoId
-                ? { ...conv, messages: [...conv.messages.slice(0, -1), { ...assistantPlaceholder, content: finalTurnData }] }
-                : conv
-            )
-          );
+        onClose: async () => {
           setIsLoading(false);
+          // Fetch the final, updated experiment data from the database
+          try {
+            const finalExperiment = await apiClient.getExperiment(currentConvo.id);
+            setConversations(prev =>
+              prev.map(conv =>
+                conv.id === activeConversationId ? finalExperiment : conv
+              )
+            );
+          } catch (e) {
+            toast.error('Failed to sync conversation history.');
+            console.error(e);
+          }
+          setStreamingNodeContent('');
         },
       });
-
     } catch (e) {
       const error = e;
-      toast.error(error.message);
+      if (typeof error === 'object' && error !== null && 'message' in error) {
+        toast.error((error as { message: string }).message);
+      } else {
+        toast.error('An unknown error occurred.');
+      }
       setIsLoading(false);
+      setStreamingNodeContent('');
     }
   };
-
-  useEffect(() => {
-    if (conversations.length === 0) {
-      handleNewConversation();
-    }
-  }, [conversations, handleNewConversation]);
 
   const activeConversation = conversations.find(c => c.id === activeConversationId) || null;
 
   return (
     <div className="flex h-screen text-white font-sans">
       <Toaster position="bottom-right" reverseOrder={false} />
-      
+
       {showGardenPathMenu && (
         <GardenPathMenu
-          onSelectExperiment={handleNewGuidedSession}
+          onSelectExperiment={() => {}}
           onClose={() => setShowGardenPathMenu(false)}
         />
       )}
@@ -482,22 +416,22 @@ const ThoughtGardenApp = () => {
         conversations={conversations}
         activeConversationId={activeConversationId}
         onSelectConversation={setActiveConversationId}
-        onNewConversation={handleNewConversation}
+        onNewConversation={() => handleNewConversation()}
         onOpenGuidedMenu={() => setShowGardenPathMenu(true)}
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
       />
-      
+
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {!isDesktop && (
           <button onClick={() => setIsSidebarOpen(true)} className="p-4 text-white z-50 fixed top-0 left-0">
-            <MenuIcon size={24} />
+            <MenuIcon />
           </button>
         )}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           <ChatArea
             activeConversation={activeConversation}
-            streamingTurn={streamingTurn}
+            streamingNodeContent={streamingNodeContent}
           />
         </div>
         <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />

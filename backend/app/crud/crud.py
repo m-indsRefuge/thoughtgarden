@@ -1,70 +1,82 @@
 # file: app/crud/crud.py
-# Contains all the reusable functions to interact with the data in the database.
-
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
-from typing import List
-
+from typing import List, Optional
+from app.schemas.schemas import ExperimentCreate, ExperimentData, ReasoningGraph, Node, NodeMetadata
 from app.models import Experiment
-from app.schemas import ExperimentCreate, ExperimentData
+import uuid
+from datetime import datetime
 
-async def create_experiment(db: AsyncSession, *, experiment_in: ExperimentCreate) -> Experiment:
+# Recursive helper to convert datetime objects to ISO strings
+def datetime_to_str(obj):
     """
-    Creates a new experiment record in the database.
-
-    Args:
-        db: The asynchronous database session.
-        experiment_in: A Pydantic model containing the title and description for the new experiment.
-
-    Returns:
-        The newly created Experiment database object.
+    Recursively converts datetime objects in a dict/list to ISO strings.
     """
-    data_payload = ExperimentData(description=experiment_in.description)
-    db_obj = Experiment(title=experiment_in.title, data=data_payload.model_dump())
+    if isinstance(obj, dict):
+        return {k: datetime_to_str(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [datetime_to_str(v) for v in obj]
+    elif isinstance(obj, datetime):
+        return obj.isoformat()
+    else:
+        return obj
+
+async def create_experiment(
+    db: AsyncSession,
+    *,
+    experiment_in: ExperimentCreate,
+) -> Experiment:
+    """
+    Creates a new experiment record in the database with an initial ReasoningGraph.
+    """
+    initial_user_node = Node(
+        id=str(uuid.uuid4()),
+        type="user_input",
+        content=experiment_in.description,
+        metadata=NodeMetadata(
+            depth=0,
+            timestamp=datetime.utcnow()  # keep as datetime; will convert later
+        )
+    )
+
+    initial_graph = ReasoningGraph(
+        nodes=[initial_user_node],
+        edges=[]
+    )
+
+    initial_data = ExperimentData(
+        description=experiment_in.description,
+        graph=initial_graph
+    )
+
+    # Convert the entire data dict recursively before inserting
+    db_obj = Experiment(
+        title=experiment_in.title,
+        data=datetime_to_str(initial_data.model_dump(by_alias=True, exclude_none=True))
+    )
+
     db.add(db_obj)
     await db.commit()
     await db.refresh(db_obj)
     return db_obj
 
-async def get_experiment(db: AsyncSession, experiment_id: int) -> Experiment | None:
-    """
-    Retrieves a single experiment by its ID.
 
-    Args:
-        db: The asynchronous database session.
-        experiment_id: The ID of the experiment to retrieve.
-
-    Returns:
-        The Experiment database object if found, otherwise None.
-    """
+async def get_experiment(db: AsyncSession, experiment_id: int) -> Optional[Experiment]:
+    """Retrieve a single experiment by its ID."""
     return await db.get(Experiment, experiment_id)
 
+
 async def get_all_experiments(db: AsyncSession) -> List[Experiment]:
-    """
-    Retrieves a list of all experiments from the database.
-
-    Args:
-        db: The asynchronous database session.
-
-    Returns:
-        A list of all Experiment database objects.
-    """
+    """Retrieve all experiments from the database."""
     result = await db.execute(select(Experiment))
     return result.scalars().all()
 
-async def update_experiment_data(db: AsyncSession, *, db_obj: Experiment, data_in: ExperimentData) -> Experiment:
-    """
-    Updates the JSON data field of an existing experiment record.
 
-    Args:
-        db: The asynchronous database session.
-        db_obj: The existing Experiment database object to update.
-        data_in: A Pydantic model containing the full, updated simulation data.
-
-    Returns:
-        The updated Experiment database object.
-    """
-    db_obj.data = data_in.model_dump()
+async def update_experiment_data(
+    db: AsyncSession, *, db_obj: Experiment, data_in: ExperimentData
+) -> Experiment:
+    """Update the JSON data field of an existing experiment record."""
+    db_obj.data = datetime_to_str(data_in.model_dump(by_alias=True, exclude_none=True))
     db.add(db_obj)
     await db.commit()
     await db.refresh(db_obj)

@@ -1,75 +1,63 @@
-# file: app/schemas/schemas.py
+# file: app/schemas/schemas.py (Refactored for Reasoning Graph)
+from typing import List, Optional, Literal, Dict, Any
+from pydantic import BaseModel, Field
+from sqlmodel import SQLModel, Field as SQLField
+from datetime import datetime
 
-from sqlmodel import SQLModel
-from typing import List, Optional
+# --- Node and Edge Schemas for the Reasoning Graph ---
 
-# --- Existing schemas for the one-shot simulation ---
+# Define the types of nodes and edges for our graph
+NodeType = Literal["user_input", "ai_expansion", "choice", "counterpoint", "reflection"]
+EdgeRelation = Literal["expands", "contradicts", "supports", "chooses", "summarizes"]
 
-class Perspective(SQLModel):
-    id: int
-    viewpoint_name: str
-    viewpoint_text: str
 
-class DebateTurn(SQLModel):
-    questioning_perspective_id: int
-    critiqued_perspective_id: int
-    questioner_name: str
-    critiqued_name: str
-    cross_question_text: str
-    response_text: str
+class NodeMetadata(BaseModel):
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    depth: int = 0
+    confidence: Optional[float] = None
+    lens: Optional[str] = None
 
-class Synthesis(SQLModel):
-    synthesis_text: str
-    reasoning_steps: Optional[str] = None
 
-class ExperimentData(SQLModel):
-    description: str
-    perspectives: List[Perspective] = []
-    debate_turns: List[DebateTurn] = []
-    synthesis: Optional[Synthesis] = None
+class Node(BaseModel):
+    id: str = Field(
+        ...,
+        description="A unique ID for the node (e.g., a UUID or hash).",
+        examples=["node-12345"]
+    )
+    type: NodeType = Field(..., description="The type of the reasoning node.")
+    content: str = Field(..., description="The textual content of the node.")
+    metadata: NodeMetadata = Field(..., description="Structured metadata for the node.")
 
-# --- API Input Schema for Simulation ---
 
-class ExperimentCreate(SQLModel):
+class Edge(BaseModel):
+    source: str = Field(..., description="The ID of the source node.")
+    target: str = Field(..., description="The ID of the target node.")
+    relation: EdgeRelation = Field(..., description="The relationship between the nodes.")
+
+
+class ReasoningGraph(BaseModel):
+    nodes: List[Node] = Field(
+        ...,
+        description="A list of all nodes in the reasoning graph."
+    )
+    edges: List[Edge] = Field(
+        ...,
+        description="A list of all edges connecting the nodes."
+    )
+
+
+# --- API Input & Output Schemas ---
+
+class UserInput(BaseModel):
+    message: str = Field(..., description="The user's message.")
+
+
+class ExperimentCreate(BaseModel):
     title: str
     description: str
 
-# --- NEW SCHEMAS for the interactive, turn-by-turn conversation flow ---
 
-class DebateArgument(SQLModel):
-    """A single persona's argument during the internal debate."""
-    persona: str
-    argument: str
-    score: int
-
-class UserInput(SQLModel):
-    """The schema for the user's input in the /advance endpoint."""
-    message: str
-
-class Turn(SQLModel):
-    """Represents a single, complete turn in the conversation."""
-    turn_number: int
-    user_message: str
-    debate: List[DebateArgument] = []
-    internal_monologue: str
-    ai_question_to_user: str
-
-class ConversationData(SQLModel):
-    """The main data structure for storing the entire conversation in the JSON blob."""
+# This is the main data blob for the Experiment model, now containing a ReasoningGraph.
+class ExperimentData(BaseModel):
     description: str
-    history: List[Turn] = []
-
-# Add to the end of app/schemas/schemas.py
-
-# --- NEW SCHEMAS for the Journeyman (pre-scripted) flow ---
-
-class JourneymanState(SQLModel):
-    """The data structure for storing the state of a pre-scripted journey."""
-    journey_id: str
-    locked_in_persona: str | None = None
-    current_step: int = 0
-
-class JourneymanTurn(SQLModel):
-    """The response model for a single turn in a Journeyman journey."""
-    narrative: str
-    is_complete: bool = False    
+    graph: Optional[ReasoningGraph] = None
