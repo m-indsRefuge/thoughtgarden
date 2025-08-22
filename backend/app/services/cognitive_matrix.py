@@ -1,47 +1,77 @@
-# file: app/services/cognitive_matrix.py
-
+# file: backend/app/services/cognitive_matrix.py (New File)
 import random
-from typing import List, Dict, Any
-from app.schemas import schemas as api_schemas # Import our new schemas
+from typing import Dict, List, Any
 
-# Define the persona affinities. In a real app, this could be more complex.
-PERSONA_AFFINITIES = {
-    'analyst': {'logic': 40, 'data': 30, 'ethics': -10},
-    'idealist': {'ethics': 50, 'hope': 25, 'practicality': -20},
-    'pragmatist': {'survival': 40, 'practicality': 40, 'abstract': -15}
+"""
+This service defines the "Cognitive Matrix," a structured set of reasoning lenses and directives.
+It uses a weighted random search algorithm to select a dynamic "reasoning lens" for the LLM 
+at each turn, ensuring variety and depth in the AI's responses.
+"""
+
+# The Cognitive Matrix: A dictionary of different reasoning approaches.
+# Each lens has a 'weight' to control its frequency of selection.
+COGNITIVE_MATRIX = {
+    "lenses": [
+        {"name": "Historical Perspective", "weight": 10, "description": "Analyze the user's idea through the lens of historical precedent and past events."},
+        {"name": "Ethical Implications", "weight": 15, "description": "Focus on the moral and ethical consequences of the user's idea."},
+        {"name": "Technological Impact", "weight": 15, "description": "Explore the technological ramifications, both immediate and long-term."},
+        {"name": "Economic Analysis", "weight": 10, "description": "Examine the economic costs, benefits, and externalities."},
+        {"name": "Psychological Motivation", "weight": 10, "description": "Consider the underlying psychological drivers and human behavior related to the idea."},
+        {"name": "Socratic Questioning", "weight": 20, "description": "Challenge the user's core assumptions by asking probing, foundational questions."},
+        {"name": "Contrarian Viewpoint", "weight": 20, "description": "Take a deliberately opposite or unpopular stance to test the strength of the user's idea."},
+    ],
+    "mutators": [
+        {"name": "Increase Abstraction", "weight": 10, "description": "Elevate the concept to a more philosophical or abstract level."},
+        {"name": "Force a Concrete Example", "weight": 15, "description": "Demand a specific, real-world example of the user's abstract idea."},
+        {"name": "Introduce a Constraint", "weight": 15, "description": "Add a new limitation or scarcity to the scenario and ask how it changes things."},
+    ]
 }
 
-def calculate_affinity(persona_id: str, tags: List[str]) -> float:
-    """Calculates a persona's affinity score based on tags."""
-    score = 0.0
-    affinities = PERSONA_AFFINITIES.get(persona_id, {})
-    for tag in tags:
-        score += affinities.get(tag, 0)
-    return score
-
-def arbitrate(
-    personas: List[api_schemas.Persona],
-    current_step: api_schemas.JourneyStep,
-    user_history: List[Any]
-) -> api_schemas.CAMResult:
+def select_dynamic_lens(conversation_depth: int) -> Dict[str, Any]:
     """
-    The Core CAM function.
-    Determines which persona "speaks" next.
-    """
-    scores = {}
-    max_score = -1
-    winner_id = ""
+    Selects a reasoning lens and a mutator from the Cognitive Matrix using a 
+    weighted random selection algorithm.
+    
+    Args:
+        conversation_depth: The number of nodes in the graph, used to adjust selection logic.
 
-    # This is a simple implementation of the formula: Score(p) = (Wp * Ap(St)) + R
-    for p in personas:
-        affinity_score = calculate_affinity(p.id, current_step.thematic_tags)
-        # We can add more complex logic here based on user_history later
-        
-        final_score = (p.base_weight * affinity_score) + random.uniform(0, 15)
-        
-        scores[p.id] = round(final_score, 2)
-        if final_score > max_score:
-            max_score = final_score
-            winner_id = p.id
+    Returns:
+        A dictionary containing the selected 'lens' and 'mutator'.
+    """
+    # Simple algorithm: As the conversation gets deeper, we favor more challenging lenses.
+    if conversation_depth > 6:
+        # Increase the weight of more "advanced" lenses like Socratic and Contrarian
+        for lens in COGNITIVE_MATRIX["lenses"]:
+            if lens["name"] in ["Socratic Questioning", "Contrarian Viewpoint"]:
+                lens["weight"] += 10
+
+    # Weighted random selection for the main lens
+    lenses = COGNITIVE_MATRIX["lenses"]
+    total_weight_lenses = sum(l['weight'] for l in lenses)
+    chosen_lens_val = random.uniform(0, total_weight_lenses)
+    
+    cumulative_weight = 0
+    selected_lens = None
+    for lens in lenses:
+        cumulative_weight += lens['weight']
+        if chosen_lens_val <= cumulative_weight:
+            selected_lens = lens
+            break
             
-    return api_schemas.CAMResult(scores=scores, winner=winner_id)
+    # Weighted random selection for the mutator (with a 50% chance of no mutator)
+    mutators = COGNITIVE_MATRIX["mutators"] + [{"name": "None", "weight": 100, "description": "No mutator."}]
+    total_weight_mutators = sum(m['weight'] for m in mutators)
+    chosen_mutator_val = random.uniform(0, total_weight_mutators)
+
+    cumulative_weight = 0
+    selected_mutator = None
+    for mutator in mutators:
+        cumulative_weight += mutator['weight']
+        if chosen_mutator_val <= cumulative_weight:
+            selected_mutator = mutator
+            break
+
+    return {
+        "lens": selected_lens,
+        "mutator": selected_mutator if selected_mutator and selected_mutator['name'] != "None" else None
+    }

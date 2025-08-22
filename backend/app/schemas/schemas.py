@@ -1,4 +1,4 @@
-# file: app/schemas/schemas.py (Refactored for Reasoning Graph)
+# file: app/schemas/schemas.py (Final Corrected Version)
 from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field
 from sqlmodel import SQLModel, Field as SQLField
@@ -6,7 +6,6 @@ from datetime import datetime
 
 # --- Node and Edge Schemas for the Reasoning Graph ---
 
-# Define the types of nodes and edges for our graph
 NodeType = Literal["user_input", "ai_expansion", "choice", "counterpoint", "reflection"]
 EdgeRelation = Literal["expands", "contradicts", "supports", "chooses", "summarizes"]
 
@@ -16,6 +15,7 @@ class NodeMetadata(BaseModel):
     depth: int = 0
     confidence: Optional[float] = None
     lens: Optional[str] = None
+    winning_strategy: Optional[str] = None # This line is the required addition
 
 
 class Node(BaseModel):
@@ -57,7 +57,6 @@ class ExperimentCreate(BaseModel):
     description: str
 
 
-# This is the main data blob for the Experiment model, now containing a ReasoningGraph.
 class ExperimentData(BaseModel):
     description: str
     graph: Optional[ReasoningGraph] = None
