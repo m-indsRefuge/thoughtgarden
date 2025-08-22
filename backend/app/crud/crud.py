@@ -1,8 +1,8 @@
-# file: app/crud/crud.py
+# file: app/crud/crud.py (Corrected)
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
 from typing import List, Optional
-from app.schemas.schemas import ExperimentCreate, ExperimentData, ReasoningGraph, Node, NodeMetadata
+from app.schemas.schemas import ExperimentCreate, ExperimentData, ReasoningGraph
 from app.models import Experiment
 import uuid
 from datetime import datetime
@@ -27,20 +27,11 @@ async def create_experiment(
     experiment_in: ExperimentCreate,
 ) -> Experiment:
     """
-    Creates a new experiment record in the database with an initial ReasoningGraph.
+    Creates a new experiment record in the database with an empty ReasoningGraph.
     """
-    initial_user_node = Node(
-        id=str(uuid.uuid4()),
-        type="user_input",
-        content=experiment_in.description,
-        metadata=NodeMetadata(
-            depth=0,
-            timestamp=datetime.utcnow()  # keep as datetime; will convert later
-        )
-    )
-
+    # Create an empty graph for a new experiment
     initial_graph = ReasoningGraph(
-        nodes=[initial_user_node],
+        nodes=[],  # Start with an empty list of nodes
         edges=[]
     )
 

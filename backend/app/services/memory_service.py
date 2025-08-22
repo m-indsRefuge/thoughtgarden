@@ -10,6 +10,7 @@ def _flatten_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
     """
     Flattens the metadata dictionary to be compatible with ChromaDB.
     Converts nested dicts (like strategy_performance) into simple key-value pairs.
+    Also handles lists by converting them to a single string.
     """
     flat_meta = {}
     for key, value in metadata.items():
@@ -17,6 +18,9 @@ def _flatten_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
             for sub_key, sub_value in value.items():
                 # e.g., 'strategy_performance' becomes 'perf_Analogical Leap'
                 flat_meta[f"perf_{sub_key}"] = sub_value
+        elif isinstance(value, list):
+            # Convert list of strings to a single comma-separated string
+            flat_meta[key] = ", ".join(map(str, value))
         else:
             flat_meta[key] = value
     return flat_meta

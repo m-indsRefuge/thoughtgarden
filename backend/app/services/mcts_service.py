@@ -1,121 +1,134 @@
-# file: backend/app/services/mcts_service.py (Updated with Evaluation and Selection)
+# file: backend/app/services/mcts_service.py (Refactored for Neural-Assisted MCTS)
+import math
+import random
 from typing import List, Dict, Any
 import logging
+import asyncio
+
+from app.schemas.schemas import ReasoningGraph, Node
+from app.schemas.dsl import Strategy, Action
+from app.services.reward_model import score_strategy
 from ollama import AsyncClient
-from app.schemas.schemas import ReasoningGraph
-import json
+from app.schemas.dsl import Strategy, Action, Constraint, Mutator
+from app.schemas.schemas import ReasoningGraph, Node, NodeMetadata, NodeType, Edge, EdgeRelation
 
 logger = logging.getLogger("tes_backend")
 OLLAMA_CLIENT = AsyncClient()
-OLLAMA_MODEL = "praxis-v1" 
+OLLAMA_MODEL = "praxis-v1"
 
+# --- MCTS Node and Core Logic ---
 class TreeNode:
     """A node in the Monte Carlo Search Tree."""
-    def __init__(self, strategy: Dict[str, str], parent=None):
+    def __init__(self, strategy: Strategy, parent: 'TreeNode' = None, state: Any = None):
         self.strategy = strategy
         self.parent = parent
-        self.children = []
+        self.children: Dict[str, 'TreeNode'] = {}
         self.visits = 0
         self.value = 0.0
+        self.state = state
+        self.is_terminal = False
 
-async def _simulate_rollout(graph: ReasoningGraph, strategy: Dict[str, str]) -> str:
+async def simulate_action(state: Dict[str, Any], action: Action) -> str:
     """
-    Performs a lightweight "rollout" or simulation.
-    Given a strategy, it asks the LLM to generate a hypothetical conversational
-    snippet to predict where that path might lead.
+    Simulates a single, lightweight step by calling the LLM with a highly constrained prompt.
+    This replaces expensive, multi-turn rollouts.
     """
-    from .llm_service import summarize_graph_context, get_last_user_input
-
-    context_summary = summarize_graph_context(graph)
-    last_user_input = get_last_user_input(graph)
-
-    simulation_prompt = f"""
-    You are a predictive simulation engine. Your task is to generate a short, hypothetical snippet of a thought experiment based on a given strategy.
-
-    ### CURRENT CONVERSATION CONTEXT
-    {context_summary}
-
-    ### GIVEN STRATEGY
-    - Name: {strategy.get("name")}
-    - Description: {strategy.get("description")}
-
-    ### SIMULATION TASK
-    Generate a plausible, single "ai_expansion" paragraph that follows the GIVEN STRATEGY. Then, predict a likely "user_input" response to that expansion.
-    The output should be a short, self-contained conversational snippet.
-
-    EXAMPLE OUTPUT:
-    AI Expansion: [A plausible AI response following the strategy]
-    Predicted User Response: [A plausible user response to the AI's expansion]
-    """
-
-    try:
-        response = await OLLAMA_CLIENT.generate(model=OLLAMA_MODEL, prompt=simulation_prompt)
-        return response.get('response', 'Simulation failed.')
-    except Exception as e:
-        logger.error(f"MCTS simulation rollout failed: {e}")
-        return "Simulation failed due to an error."
-
-async def _evaluate_simulation(simulation_text: str) -> Dict[str, float]:
-    """
-    Acts as the "Narrative Judge" to score a simulation's quality.
-    """
-    evaluation_prompt = f"""
-    You are a Narrative Judge. Your task is to analyze a simulated conversation and score its potential.
+    # A highly constrained prompt to generate a concise, single-turn simulation.
+    prompt = f"""
+    You are a simulator. Given the user's last input and a chosen action, generate a brief, realistic single-turn AI response to that action.
     
-    ### SIMULATED CONVERSATION
-    {simulation_text}
+    ### CONVERSATION CONTEXT
+    The user's last input was: "{state['graph'].nodes[-1].content}"
     
-    ### CRITERIA
-    - **Novelty:** How creative or surprising is this path? (Score 0.0 - 1.0)
-    - **Depth:** Does it lead to a deeper intellectual or philosophical question? (Score 0.0 - 1.0)
-    - **Engagement:** Is it likely to provoke a thoughtful and detailed user response? (Score 0.0 - 1.0)
-    
-    ### TASK
-    Provide a JSON object with a score for each criterion. The total score will be the sum of these.
+    ### ACTION TO SIMULATE
+    Action Type: {action.type}
+    Action Description: {action.step_description}
 
-    EXAMPLE OUTPUT:
-    {{"novelty": 0.8, "depth": 0.9, "engagement": 0.7}}
+    ### YOUR TASK
+    Based on this action, generate ONLY the AI's hypothetical response for the next turn. Do not add any extra conversation.
     """
     try:
-        response = await OLLAMA_CLIENT.generate(model=OLLAMA_MODEL, prompt=evaluation_prompt, format="json")
-        scores = json.loads(response['response'])
-        return scores if isinstance(scores, dict) else {}
+        response = await asyncio.wait_for(
+            OLLAMA_CLIENT.generate(model=OLLAMA_MODEL, prompt=prompt, options={"num_predict": 100}), # Limit response length for speed
+            timeout=10.0 # Strict timeout for simulation
+        )
+        return response['response'].strip()
     except Exception as e:
-        logger.error(f"Narrative Judge evaluation failed: {e}")
-        return {"novelty": 0.0, "depth": 0.0, "engagement": 0.0}
+        logger.error(f"Failed to simulate action with LLM: {e}")
+        return "Simulation failed."
 
-async def find_best_strategy(graph: ReasoningGraph, candidate_strategies: List[Dict[str, str]]) -> Dict[str, str]:
+async def find_best_strategy(graph: ReasoningGraph, candidate_strategies: List[Strategy]) -> Strategy:
     """
-    Uses a Monte Carlo Tree Search to evaluate a list of candidate strategies
-    and select the most promising one.
+    Uses a simplified Monte Carlo Tree Search to evaluate candidate strategies.
+    This version replaces expensive LLM rollouts with a single simulated action
+    and a call to our reward model.
     """
-    logger.info(f"MCTS Service: Received {len(candidate_strategies)} candidate strategies. Beginning full MCTS loop.")
-    
-    scored_strategies = []
-    
-    # --- PHASE 1: EXPANSION & SIMULATION ---
+    logger.info("MCTS Service: Beginning simplified neural-assisted MCTS loop.")
+
+    # A single root node to start the search
+    root_state = {"graph": graph, "candidates": candidate_strategies}
+    root = TreeNode(strategy=Strategy(goal="root", priority=0.0, constraints=[], lenses=[], mutators=[], actions=[]), state=root_state)
+
+    # Initialize the tree with all candidate strategies as children of the root
     for strategy in candidate_strategies:
-        simulation_text = await _simulate_rollout(graph, strategy)
-        
-        # --- PHASE 2: EVALUATION ---
-        evaluation_scores = await _evaluate_simulation(simulation_text)
-        
-        # Calculate a total value for the strategy
-        total_value = evaluation_scores.get('novelty', 0) + evaluation_scores.get('depth', 0) + evaluation_scores.get('engagement', 0)
-        
-        scored_strategies.append({
-            "strategy": strategy,
-            "value": total_value,
-            "scores": evaluation_scores
-        })
-        logger.info(f"Evaluated strategy '{strategy['name']}': Value={total_value:.2f}, Scores={evaluation_scores}")
+        child_state = {"graph": graph, "strategy": strategy}
+        root.children[strategy.id] = TreeNode(strategy=strategy, parent=root, state=child_state)
 
-    # --- PHASE 3: SELECTION ---
-    if not scored_strategies:
-        return {"name": "Default Fallback", "description": "Respond directly to the user's prompt."}
+    # MCTS loop with a fixed number of iterations for now
+    iterations = 5 
+    cpuct = 1.0  # Exploration constant
+
+    for _ in range(iterations):
+        node = root
+        path = []
         
-    best_strategy = max(scored_strategies, key=lambda x: x['value'])
+        # 1. SELECTION: Traverse the tree to find the best leaf node to expand
+        while node.children:
+            total_visits = sum(child.visits for child in node.children.values())
+            
+            # Using the PUCT formula for selection
+            def puct_score(child_node: TreeNode):
+                # We use strategy.priority as our initial policy prior (P)
+                prior = child_node.strategy.priority
+                # Q(s,a) = child_node.value
+                # N(s,a) = child_node.visits
+                # N(s,b) = total_visits
+                # P(a|s) = prior
+                if child_node.visits == 0:
+                    return float('inf') # Prioritize unvisited nodes
+                return child_node.value / child_node.visits + cpuct * prior * (math.sqrt(total_visits) / (1 + child_node.visits))
+
+            action_id, node = max(
+                node.children.items(),
+                key=lambda item: puct_score(item[1])
+            )
+            path.append(node)
+            
+        # 2. EXPANSION & EVALUATION: A "leaf" node is selected. Simulate and score its value.
+        simulated_response = await simulate_action(node.state, node.strategy.actions[0])
+
+        # Score the simulated response using the reward model
+        value = await score_strategy(node.state['graph'], node.strategy, simulated_response)
+        
+        # 3. BACKUP: Propagate the value back up the tree
+        for visited_node in reversed(path):
+            visited_node.visits += 1
+            visited_node.value += value
+            
+    # 4. SELECTION: Choose the best strategy based on the most-visited node at the root level
+    if not root.children:
+        logger.error("MCTS failed to expand any nodes. Returning default.")
+        return Strategy(
+            goal="Default Fallback",
+            priority=0.0,
+            constraints=[],
+            lenses=[],
+            mutators=[],
+            actions=[Action(type="generate_text", step_description="Respond directly to the user's input.")]
+        )
+
+    best_child = max(root.children.values(), key=lambda node: node.visits)
     
-    logger.info(f"MCTS Service: Selected winning strategy '{best_strategy['strategy']['name']}' with a total value of {best_strategy['value']:.2f}")
+    logger.info(f"MCTS Service: Selected winning strategy '{best_child.strategy.goal}' with {best_child.visits} visits.")
 
-    return best_strategy['strategy']
+    return best_child.strategy

@@ -237,7 +237,30 @@ const ThoughtGardenApp = () => {
         description: "A new session initiated by the user.",
       };
       const newExperiment = await apiClient.createExperiment(experimentIn);
-      setConversations(prev => [newExperiment, ...prev]);
+
+      // Add an initial greeting from Praxis
+      const greetingNode: Node = {
+        id: `ai-${Date.now()}`,
+        type: 'ai_expansion',
+        content: "Welcome. How shall we begin our shared thought experiment?",
+        metadata: {
+          timestamp: new Date().toISOString(),
+          depth: 0,
+        }
+      };
+
+      const updatedExperiment = {
+        ...newExperiment,
+        data: {
+          ...newExperiment.data,
+          graph: {
+            nodes: [greetingNode],
+            edges: [],
+          }
+        }
+      };
+
+      setConversations(prev => [updatedExperiment, ...prev]);
       setActiveConversationId(newExperiment.id);
       setIsSidebarOpen(false);
     } catch (e) {

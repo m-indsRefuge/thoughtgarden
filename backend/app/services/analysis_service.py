@@ -1,17 +1,13 @@
-# file: backend/app/services/analysis_service.py (Updated with Timeouts)
+# file: backend/app/services/analysis_service.py (Updated)
 from typing import List, Dict, Any
 from app.schemas.schemas import ReasoningGraph, Node
 import logging
 from ollama import AsyncClient
 import json
-import asyncio
 
 logger = logging.getLogger("tes_backend")
 OLLAMA_CLIENT = AsyncClient()
 OLLAMA_MODEL = "praxis-v1" 
-
-# Define a reasonable timeout for LLM calls
-LLM_TIMEOUT = 60.0  # 60 seconds
 
 # --- Core Analysis Functions ---
 
@@ -29,45 +25,43 @@ async def generate_experiment_summary(graph: ReasoningGraph) -> Dict[str, Any]:
     summary_prompt = f"""
     You are an analyst. Your task is to read the full transcript of a thought experiment and generate a concise, high-level summary. The summary should capture the initial premise, the key ideas explored, and the final state or conclusion.
 
-    ### EXPERIMENT TRANSCRIPT
+    ### RULES
+    1. The output must be valid JSON with a 'summary' key and a 'keywords' key.
+    2. The 'summary' value should be a single paragraph of text.
+    3. The 'keywords' value must be a list of 5 to 10 relevant terms.
+    4. The summary MUST NOT contain conversational filler or preambles.
+    5. Be succinct and focused.
+
+    ### TRANSCRIPT
     {full_history}
 
-    ### YOUR TASK
-    Generate a concise summary (1-2 paragraphs) of the experiment.
+    ### RESPONSE FORMAT
+    ```json
+    {{
+        "summary": "...",
+        "keywords": ["...", "..."]
+    }}
+    ```
     """
+    
+    logger.info("ANALYSIS SERVICE: Generating experiment summary with LLM...")
+
     try:
-        # Generate summary with timeout
-        summary_task = OLLAMA_CLIENT.generate(model=OLLAMA_MODEL, prompt=summary_prompt)
-        response = await asyncio.wait_for(summary_task, timeout=LLM_TIMEOUT)
-        summary_text = response.get('response', 'Summary generation timed out.')
-
-        keywords_prompt = f"""
-        You are an analyst. Your task is to read the following summary and extract 5-7 key keywords that describe the main topics.
-
-        ### SUMMARY
-        {summary_text}
-
-        ### YOUR TASK
-        Generate a JSON list of these keywords.
-        """
-        # Generate keywords with timeout
-        keywords_task = OLLAMA_CLIENT.generate(model=OLLAMA_MODEL, prompt=keywords_prompt, format="json")
-        keywords_response = await asyncio.wait_for(keywords_task, timeout=LLM_TIMEOUT)
-        keywords = json.loads(keywords_response['response'])
-        
-        return {"summary_text": summary_text, "keywords": keywords}
-        
-    except asyncio.TimeoutError:
-        logger.error("LLM call timed out during experiment summary generation.")
-        return {"summary_text": "Failed to generate summary due to timeout.", "keywords": ["error", "timeout"]}
+        response = await OLLAMA_CLIENT.generate(
+            model=OLLAMA_MODEL,
+            prompt=summary_prompt,
+            format="json"
+        )
+        summary_response = json.loads(response['response'])
+        logger.info("ANALYSIS SERVICE: Summary generated successfully.")
+        return summary_response
     except Exception as e:
-        logger.error(f"Failed to generate experiment summary or keywords: {e}")
-        return {"summary_text": "Failed to generate summary.", "keywords": ["error"]}
+        logger.error(f"Failed to generate summary with LLM: {e}")
+        return {"summary": "Summary generation failed.", "keywords": []}
+
 
 def analyze_experiment_outcome(graph: ReasoningGraph) -> Dict[str, Any]:
-    """
-    Analyzes a completed thought experiment to correlate strategies with outcomes.
-    """
+    """Analyzes the outcome of an experiment based on user engagement."""
     logger.info("ANALYSIS SERVICE: Beginning post-experiment analysis with real logic.")
     
     total_engagement = 0
@@ -102,6 +96,5 @@ def analyze_experiment_outcome(graph: ReasoningGraph) -> Dict[str, Any]:
         "strategy_performance": final_strategy_scores
     }
 
-    logger.info(f"ANALYSIS SERVICE: Post-experiment analysis complete. Results: {analysis_summary}")
-    
+    logger.info(f"ANALYSIS SERVICE: Analysis complete. Results: {analysis_summary}")
     return analysis_summary

@@ -11,7 +11,8 @@ from app.core.database import create_db_and_tables
 from app.api import endpoints
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+# This is a good place to set the default logging level for the application.
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("tes_backend")
 
 
