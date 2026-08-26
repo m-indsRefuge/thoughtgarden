@@ -89,11 +89,11 @@ def test_phase_submissions_have_explicit_shapes() -> None:
 
 
 def test_all_three_soul_contracts_exist_and_reject_impersonation() -> None:
-    root = Path(__file__).resolve().parents[2]
+    backend_root = Path(__file__).resolve().parents[1]
     paths = [
-        root / "app" / "praxis" / "minds" / "plato" / "soul.md",
-        root / "app" / "praxis" / "minds" / "nietzsche" / "soul.md",
-        root / "app" / "praxis" / "minds" / "faust" / "soul.md",
+        backend_root / "app" / "praxis" / "minds" / "plato" / "soul.md",
+        backend_root / "app" / "praxis" / "minds" / "nietzsche" / "soul.md",
+        backend_root / "app" / "praxis" / "minds" / "faust" / "soul.md",
     ]
 
     for path in paths:

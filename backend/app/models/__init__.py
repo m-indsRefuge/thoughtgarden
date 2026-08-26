@@ -1,3 +1,7 @@
-# file: app/models/__init__.py
+"""Persistence models for ThoughtGarden V2."""
+
 from sqlmodel import SQLModel
-from .experiment import Experiment
+
+from app.models.inquiry import Inquiry
+
+__all__ = ["Inquiry", "SQLModel"]
